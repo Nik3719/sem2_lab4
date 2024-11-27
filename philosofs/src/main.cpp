@@ -2,43 +2,64 @@
 #include <thread>
 #include <mutex>
 #include <vector>
-#include <chrono>
+
+using namespace std;
 
 const int NUM_PHILOSOPHERS = 5;
 
-std::mutex forks[NUM_PHILOSOPHERS];
+mutex forks[NUM_PHILOSOPHERS];
+int philosofs[NUM_PHILOSOPHERS]{};
+mutex mt;
 
-void philosopher(int id)
+void SafePrint(int phId, string doing)
+{
+    mt.lock();
+    string print = "Philosopher " + to_string(phId + 1) + " " + doing + "\n";
+    cout << print;
+    mt.unlock();
+}
+
+
+
+void philosof(int philosopher_id)
 {
     while (true)
     {
-        std::cout << "Philosopher " << id + 1 << " is thinking." << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000)); // Философ думает
+        SafePrint(philosopher_id, "is thinking");
+        this_thread::sleep_for(chrono::milliseconds(5000)); // Философ думает
 
-        // Берем вилки
-        std::unique_lock<std::mutex> left_fork(forks[id]);
-        std::unique_lock<std::mutex> right_fork(forks[(id + 1) % NUM_PHILOSOPHERS]);
+        // Определяем вилки
+        int left_fork = philosopher_id;
+        int right_fork = (philosopher_id + 1) % NUM_PHILOSOPHERS;
+        {
+            lock(forks[left_fork], forks[right_fork]);
+            lock_guard<mutex> left_lock(forks[left_fork], adopt_lock);
+            lock_guard<mutex> right_lock(forks[right_fork], adopt_lock);
 
-        std::cout << "Philosopher " << id + 1 << " is eating." << std::endl;
-        std::this_thread::sleep_for(std::chrono::milliseconds(5000)); // Философ ест
-
-        // Вилки автоматически освобождаются при выходе из области видимости
+            SafePrint(philosopher_id, "is eating");
+            this_thread::sleep_for(chrono::milliseconds(5000)); // Философ ест
+        }
     }
 }
 
 int main()
 {
-    std::vector<std::thread> philosophers;
+    vector<thread> philosophers;
 
     for (int i = 0; i < NUM_PHILOSOPHERS; ++i)
     {
-        philosophers.emplace_back(philosopher, i);
+        philosophers.emplace_back(philosof, i);
     }
 
     for (auto &philosopher : philosophers)
     {
         philosopher.join();
     }
+
+    // for (int i = 0; i < NUM_PHILOSOPHERS; i++)
+    // {
+    //     cout << philosofs[i] << " ";
+    // }
 
     return 0;
 }
